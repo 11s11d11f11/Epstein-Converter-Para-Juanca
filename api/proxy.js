@@ -1,4 +1,4 @@
-// api/proxy.js - Vercel Serverless Function con Y2mate API
+// api/proxy.js - Vercel Serverless Function con SaveFrom/Y2mate alternativo
 export default async function handler(req, res) {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,127 +25,172 @@ export default async function handler(req, res) {
         return res.status(400).json({ status: 'error', text: 'Invalid YouTube URL' });
     }
     const videoId = videoIdMatch[1];
+    const isAudio = downloadMode === 'audio';
 
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+
+    // Intentar multiples APIs
+    const apis = [
+        tryY2mateIs,
+        trySsyoutube,
+        tryYtDownloader
     ];
-    const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
 
-    try {
-        // Paso 1: Analizar el video con Y2mate
-        console.log('Analyzing video:', videoId);
-        
-        const analyzeResponse = await fetch('https://www.y2mate.com/mates/analyzeV2/ajax', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': randomUA,
-                'Origin': 'https://www.y2mate.com',
-                'Referer': 'https://www.y2mate.com/'
-            },
-            body: `k_query=https://www.youtube.com/watch?v=${videoId}&k_page=home&hl=en&q_auto=0`
-        });
-
-        if (!analyzeResponse.ok) {
-            throw new Error(`Analyze failed: HTTP ${analyzeResponse.status}`);
-        }
-
-        const analyzeData = await analyzeResponse.json();
-        console.log('Analyze response status:', analyzeData.status);
-
-        if (analyzeData.status !== 'ok') {
-            throw new Error(analyzeData.mess || 'Video analysis failed');
-        }
-
-        // Obtener el key del video y las opciones de formato
-        const vid = analyzeData.vid;
-        const isAudio = downloadMode === 'audio';
-        
-        let formatKey = null;
-        let formatSize = '';
-        
-        if (isAudio) {
-            // Buscar formato MP3
-            const mp3Formats = analyzeData.links?.mp3;
-            if (mp3Formats) {
-                // Obtener la mejor calidad de MP3
-                const keys = Object.keys(mp3Formats);
-                if (keys.length > 0) {
-                    formatKey = mp3Formats[keys[0]].k;
-                    formatSize = mp3Formats[keys[0]].size;
-                }
+    for (const apiFunc of apis) {
+        try {
+            const result = await apiFunc(videoId, isAudio, userAgent);
+            if (result && result.url) {
+                return res.status(200).json(result);
             }
-        } else {
-            // Buscar formato MP4 720p o el mejor disponible
-            const mp4Formats = analyzeData.links?.mp4;
-            if (mp4Formats) {
-                // Prioridad: 720p > 480p > 360p
-                const priorities = ['720p', '480p', '360p', '1080p'];
-                for (const quality of priorities) {
-                    if (mp4Formats[quality]) {
-                        formatKey = mp4Formats[quality].k;
-                        formatSize = mp4Formats[quality].size;
-                        break;
-                    }
-                }
-                // Si no encontró ninguno, usar el primero disponible
-                if (!formatKey) {
-                    const keys = Object.keys(mp4Formats);
-                    if (keys.length > 0) {
-                        formatKey = mp4Formats[keys[0]].k;
-                        formatSize = mp4Formats[keys[0]].size;
-                    }
-                }
-            }
+        } catch (err) {
+            console.log(`API failed: ${err.message}`);
         }
-
-        if (!formatKey) {
-            throw new Error('No suitable format found for this video');
-        }
-
-        console.log('Converting with key:', formatKey);
-
-        // Paso 2: Obtener el link de descarga
-        const convertResponse = await fetch('https://www.y2mate.com/mates/convertV2/index', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': randomUA,
-                'Origin': 'https://www.y2mate.com',
-                'Referer': 'https://www.y2mate.com/'
-            },
-            body: `vid=${vid}&k=${encodeURIComponent(formatKey)}`
-        });
-
-        if (!convertResponse.ok) {
-            throw new Error(`Convert failed: HTTP ${convertResponse.status}`);
-        }
-
-        const convertData = await convertResponse.json();
-        console.log('Convert response status:', convertData.status);
-
-        if (convertData.status !== 'ok') {
-            throw new Error(convertData.mess || 'Conversion failed');
-        }
-
-        if (!convertData.dlink) {
-            throw new Error('No download link received');
-        }
-
-        // Devolver en formato compatible con el frontend
-        return res.status(200).json({
-            status: 'success',
-            url: convertData.dlink,
-            title: analyzeData.title || 'video',
-            size: formatSize
-        });
-
-    } catch (err) {
-        console.error('Error:', err.message);
-        return res.status(503).json({
-            status: 'error',
-            text: err.message
-        });
     }
+
+    return res.status(503).json({
+        status: 'error',
+        text: 'All download services are currently unavailable. Please try again later.'
+    });
+}
+
+// API 1: y2mate.is (alternativo)
+async function tryY2mateIs(videoId, isAudio, userAgent) {
+    console.log('Trying y2mate.is...');
+    
+    // Paso 1: Analizar
+    const analyzeRes = await fetch('https://www.y2mate.is/mates/analyzeV2/ajax', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': userAgent,
+            'Origin': 'https://www.y2mate.is',
+            'Referer': 'https://www.y2mate.is/'
+        },
+        body: `k_query=https://www.youtube.com/watch?v=${videoId}&k_page=home&hl=en&q_auto=0`
+    });
+
+    if (!analyzeRes.ok) throw new Error(`HTTP ${analyzeRes.status}`);
+    
+    const data = await analyzeRes.json();
+    if (data.status !== 'ok') throw new Error(data.mess || 'Analysis failed');
+
+    // Buscar formato
+    const formats = isAudio ? data.links?.mp3 : data.links?.mp4;
+    if (!formats || Object.keys(formats).length === 0) {
+        throw new Error('No formats available');
+    }
+
+    // Obtener el mejor formato
+    let formatKey, quality;
+    if (isAudio) {
+        const keys = Object.keys(formats);
+        formatKey = formats[keys[0]].k;
+        quality = keys[0];
+    } else {
+        const priorities = ['720p', '480p', '360p', '1080p'];
+        for (const q of priorities) {
+            if (formats[q]) {
+                formatKey = formats[q].k;
+                quality = q;
+                break;
+            }
+        }
+        if (!formatKey) {
+            const keys = Object.keys(formats);
+            formatKey = formats[keys[0]].k;
+            quality = keys[0];
+        }
+    }
+
+    // Paso 2: Convertir
+    const convertRes = await fetch('https://www.y2mate.is/mates/convertV2/index', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': userAgent,
+            'Origin': 'https://www.y2mate.is',
+            'Referer': 'https://www.y2mate.is/'
+        },
+        body: `vid=${data.vid}&k=${encodeURIComponent(formatKey)}`
+    });
+
+    if (!convertRes.ok) throw new Error(`Convert HTTP ${convertRes.status}`);
+    
+    const convertData = await convertRes.json();
+    if (convertData.status !== 'ok' || !convertData.dlink) {
+        throw new Error('Conversion failed');
+    }
+
+    return {
+        status: 'success',
+        url: convertData.dlink,
+        title: data.title || 'video',
+        quality: quality
+    };
+}
+
+// API 2: ssyoutube.com
+async function trySsyoutube(videoId, isAudio, userAgent) {
+    console.log('Trying ssyoutube...');
+    
+    const response = await fetch(`https://api.ssyoutube.com/api/v1/?url=https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+            'User-Agent': userAgent
+        }
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const data = await response.json();
+    
+    if (!data.formats || data.formats.length === 0) {
+        throw new Error('No formats');
+    }
+
+    // Buscar el formato adecuado
+    let downloadUrl;
+    if (isAudio) {
+        const audio = data.formats.find(f => f.mimeType?.includes('audio'));
+        downloadUrl = audio?.url;
+    } else {
+        const video = data.formats.find(f => f.quality === '720p' || f.quality === '480p' || f.quality === '360p');
+        downloadUrl = video?.url || data.formats[0]?.url;
+    }
+
+    if (!downloadUrl) throw new Error('No download URL');
+
+    return {
+        status: 'success',
+        url: downloadUrl,
+        title: data.title || 'video'
+    };
+}
+
+// API 3: yt-download.org style
+async function tryYtDownloader(videoId, isAudio, userAgent) {
+    console.log('Trying yt-downloader...');
+    
+    const format = isAudio ? 'mp3' : 'mp4';
+    const response = await fetch('https://api.vevioz.com/api/button/' + format, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': userAgent
+        },
+        body: `url=https://www.youtube.com/watch?v=${videoId}`
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const html = await response.text();
+    
+    // Extraer URL del HTML
+    const urlMatch = html.match(/href="(https:\/\/[^"]+\.(?:mp4|mp3|webm)[^"]*)"/i);
+    if (!urlMatch) throw new Error('No download link found');
+
+    return {
+        status: 'success',
+        url: urlMatch[1],
+        title: 'video'
+    };
 }
