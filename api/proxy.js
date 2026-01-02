@@ -1,4 +1,7 @@
-// api/proxy.js - Vercel Serverless con RapidAPI
+// api/proxy.js - Vercel Serverless con YouTube Video FAST Downloader 24/7
+const RAPIDAPI_KEY = '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
+const API_HOST = 'youtube-video-fast-downloader-24-7.p.rapidapi.com';
+
 export default async function handler(req, res) {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,62 +24,93 @@ export default async function handler(req, res) {
 
     const isAudio = downloadMode === 'audio';
     
-    // RapidAPI Key
-    const RAPIDAPI_KEY = '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
-    
     try {
-        // La API usa "videoId" no "url" segun documentacion
         // Extraer video ID de la URL
-        let videoId = url;
         const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
-        if (match) {
-            videoId = match[1];
+        if (!match) {
+            throw new Error('Invalid YouTube URL');
         }
+        const videoId = match[1];
+        const isShort = url.includes('/shorts/');
         
-        console.log('Video ID:', videoId);
-        console.log('Format:', isAudio ? 'mp3' : 'mp4');
+        console.log('Video ID:', videoId, 'isAudio:', isAudio, 'isShort:', isShort);
         
-        // Probar con el endpoint correcto segun RapidAPI docs
-        const apiUrl = `https://youtube-to-mp315.p.rapidapi.com/download?url=${encodeURIComponent(url)}&format=${isAudio ? 'mp3' : 'mp4'}`;
-        
-        const response = await fetch(apiUrl, {
-            method: 'GET',
+        // PASO 1: Obtener calidades disponibles
+        const qualityRes = await fetch(`https://${API_HOST}/get_available_quality/${videoId}`, {
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEY,
-                'X-RapidAPI-Host': 'youtube-to-mp315.p.rapidapi.com'
+                'X-RapidAPI-Host': API_HOST
             }
         });
-
-        const responseText = await response.text();
-        console.log('RapidAPI status:', response.status);
-        console.log('RapidAPI response:', responseText);
         
-        if (!response.ok) {
-            throw new Error(`API error ${response.status}: ${responseText}`);
-        }
-
-        const data = JSON.parse(responseText);
-
-        // Si ya tiene URL de descarga
-        if (data.downloadUrl || data.link || data.url) {
-            return res.status(200).json({
-                status: 'success',
-                url: data.downloadUrl || data.link || data.url,
-                title: data.title || 'video'
-            });
+        if (!qualityRes.ok) {
+            const errText = await qualityRes.text();
+            throw new Error(`Quality API error ${qualityRes.status}: ${errText}`);
         }
         
-        // Si tiene ID, hacer polling
-        if (data.id) {
-            const result = await pollForResult(data.id, RAPIDAPI_KEY);
-            return res.status(200).json({
-                status: 'success',
-                url: result.downloadUrl || result.link,
-                title: result.title || data.title || 'video'
-            });
+        const qualities = await qualityRes.json();
+        console.log('Available qualities:', JSON.stringify(qualities));
+        
+        // Seleccionar la mejor calidad segun tipo
+        let selectedQuality;
+        if (isAudio) {
+            // Buscar audio
+            selectedQuality = qualities.find(q => q.type === 'audio');
+        } else {
+            // Buscar video, preferir 720p o 480p o la mejor disponible
+            const videoQualities = qualities.filter(q => q.type === 'video');
+            selectedQuality = videoQualities.find(q => q.quality === '720p') ||
+                              videoQualities.find(q => q.quality === '480p') ||
+                              videoQualities.find(q => q.quality === '360p') ||
+                              videoQualities[0];
         }
-
-        throw new Error(data.error || data.message || 'No download URL');
+        
+        if (!selectedQuality) {
+            throw new Error('No suitable quality found');
+        }
+        
+        console.log('Selected quality:', selectedQuality.id, selectedQuality.quality);
+        
+        // PASO 2: Solicitar descarga
+        let downloadEndpoint;
+        if (isAudio) {
+            downloadEndpoint = `https://${API_HOST}/download_audio/${videoId}?quality=${selectedQuality.id}`;
+        } else if (isShort) {
+            downloadEndpoint = `https://${API_HOST}/download_short/${videoId}?quality=${selectedQuality.id}`;
+        } else {
+            downloadEndpoint = `https://${API_HOST}/download_video/${videoId}?quality=${selectedQuality.id}`;
+        }
+        
+        console.log('Download endpoint:', downloadEndpoint);
+        
+        const downloadRes = await fetch(downloadEndpoint, {
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEY,
+                'X-RapidAPI-Host': API_HOST
+            }
+        });
+        
+        if (!downloadRes.ok) {
+            const errText = await downloadRes.text();
+            throw new Error(`Download API error ${downloadRes.status}: ${errText}`);
+        }
+        
+        const downloadData = await downloadRes.json();
+        console.log('Download response:', JSON.stringify(downloadData));
+        
+        if (!downloadData.file) {
+            throw new Error('No file URL in response');
+        }
+        
+        // PASO 3: Hacer polling hasta que el archivo este disponible
+        const fileUrl = await waitForFile(downloadData.file);
+        
+        return res.status(200).json({
+            status: 'success',
+            url: fileUrl,
+            title: `video_${videoId}`,
+            quality: selectedQuality.quality
+        });
 
     } catch (err) {
         console.error('Error:', err.message);
@@ -87,31 +121,25 @@ export default async function handler(req, res) {
     }
 }
 
-// Polling para esperar resultado
-async function pollForResult(id, apiKey) {
-    for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 2000));
+// Polling para esperar que el archivo este disponible
+async function waitForFile(fileUrl) {
+    console.log('Waiting for file:', fileUrl);
+    
+    for (let i = 0; i < 12; i++) {
+        await new Promise(r => setTimeout(r, 5000)); // Esperar 5 segundos
         
-        const response = await fetch(`https://youtube-to-mp315.p.rapidapi.com/status/${id}`, {
-            headers: {
-                'X-RapidAPI-Key': apiKey,
-                'X-RapidAPI-Host': 'youtube-to-mp315.p.rapidapi.com'
+        try {
+            const response = await fetch(fileUrl, { method: 'HEAD' });
+            console.log('File check attempt', i + 1, 'status:', response.status);
+            
+            if (response.ok) {
+                return fileUrl;
             }
-        });
-
-        if (!response.ok) continue;
-        
-        const data = await response.json();
-        console.log('Poll status:', data.status);
-        
-        if (data.status === 'AVAILABLE' || data.downloadUrl || data.link) {
-            return data;
-        }
-        
-        if (data.status === 'CONVERSION_ERROR' || data.error) {
-            throw new Error('Conversion failed');
+        } catch (e) {
+            console.log('File check error:', e.message);
         }
     }
     
-    throw new Error('Timeout');
+    // Devolver URL de todas formas, el usuario puede reintentar
+    return fileUrl;
 }
