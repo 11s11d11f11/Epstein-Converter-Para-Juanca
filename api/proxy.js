@@ -22,60 +22,61 @@ export default async function handler(req, res) {
     const isAudio = downloadMode === 'audio';
     
     // RapidAPI Key
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
+    const RAPIDAPI_KEY = '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
     
     try {
-        console.log('Calling RapidAPI...');
+        // La API usa "videoId" no "url" segun documentacion
+        // Extraer video ID de la URL
+        let videoId = url;
+        const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+        if (match) {
+            videoId = match[1];
+        }
         
-        // Llamar a RapidAPI YouTube to MP3
-        const response = await fetch('https://youtube-to-mp315.p.rapidapi.com/download', {
-            method: 'POST',
+        console.log('Video ID:', videoId);
+        console.log('Format:', isAudio ? 'mp3' : 'mp4');
+        
+        // Probar con el endpoint correcto segun RapidAPI docs
+        const apiUrl = `https://youtube-to-mp315.p.rapidapi.com/download?url=${encodeURIComponent(url)}&format=${isAudio ? 'mp3' : 'mp4'}`;
+        
+        const response = await fetch(apiUrl, {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
                 'X-RapidAPI-Key': RAPIDAPI_KEY,
                 'X-RapidAPI-Host': 'youtube-to-mp315.p.rapidapi.com'
-            },
-            body: JSON.stringify({
-                url: url,
-                format: isAudio ? 'mp3' : 'mp4',
-                quality: 0
-            })
+            }
         });
 
+        const responseText = await response.text();
+        console.log('RapidAPI status:', response.status);
+        console.log('RapidAPI response:', responseText);
+        
         if (!response.ok) {
-            const errorText = await response.text();
-            console.log('RapidAPI error:', response.status, errorText);
-            throw new Error(`RapidAPI HTTP ${response.status}`);
+            throw new Error(`API error ${response.status}: ${responseText}`);
         }
 
-        const data = await response.json();
-        console.log('RapidAPI response:', data);
+        const data = JSON.parse(responseText);
 
-        // Si ya está disponible
-        if (data.status === 'AVAILABLE' && data.downloadUrl) {
+        // Si ya tiene URL de descarga
+        if (data.downloadUrl || data.link || data.url) {
             return res.status(200).json({
                 status: 'success',
-                url: data.downloadUrl,
+                url: data.downloadUrl || data.link || data.url,
                 title: data.title || 'video'
             });
         }
-
-        // Si está procesando, hacer polling
-        if (data.id && data.status === 'PROCESSING') {
-            const downloadUrl = await pollForResult(data.id, RAPIDAPI_KEY);
+        
+        // Si tiene ID, hacer polling
+        if (data.id) {
+            const result = await pollForResult(data.id, RAPIDAPI_KEY);
             return res.status(200).json({
                 status: 'success',
-                url: downloadUrl,
-                title: data.title || 'video'
+                url: result.downloadUrl || result.link,
+                title: result.title || data.title || 'video'
             });
         }
 
-        // Si hay error
-        if (data.status === 'CONVERSION_ERROR') {
-            throw new Error('Conversion failed');
-        }
-
-        throw new Error('Unexpected response: ' + JSON.stringify(data));
+        throw new Error(data.error || data.message || 'No download URL');
 
     } catch (err) {
         console.error('Error:', err.message);
@@ -101,15 +102,16 @@ async function pollForResult(id, apiKey) {
         if (!response.ok) continue;
         
         const data = await response.json();
+        console.log('Poll status:', data.status);
         
-        if (data.status === 'AVAILABLE' && data.downloadUrl) {
-            return data.downloadUrl;
+        if (data.status === 'AVAILABLE' || data.downloadUrl || data.link) {
+            return data;
         }
         
-        if (data.status === 'CONVERSION_ERROR') {
+        if (data.status === 'CONVERSION_ERROR' || data.error) {
             throw new Error('Conversion failed');
         }
     }
     
-    throw new Error('Timeout waiting for conversion');
+    throw new Error('Timeout');
 }
