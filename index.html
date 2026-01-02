@@ -643,15 +643,10 @@
         'use strict';
 
         // ========================================
-        // CONFIGURACION - Llamada DIRECTA a Cobalt
+        // CONFIGURACION - Usa proxy de Vercel
         // ========================================
         const CONFIG = {
-            // Instancias de Cobalt con CORS abierto (probar en orden)
-            COBALT_INSTANCES: [
-                'https://cobalt.perennialte.ch',
-                'https://cobalt.hypert.net',
-                'https://co.e96.one'
-            ],
+            PROXY_URL: '/api/proxy',
             YT_REGEX: /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w\-]{11}/i
         };
 
@@ -731,55 +726,37 @@
         };
 
         // ========================================
-        // Llamar DIRECTO a Cobalt (sin proxy)
+        // Llamar al proxy de Vercel
         // ========================================
         const convertWithCobalt = async (videoUrl, format) => {
-            let lastError = null;
+            console.log('Connecting to proxy...');
             
-            for (const instance of CONFIG.COBALT_INSTANCES) {
-                try {
-                    const apiUrl = instance + '/api/json';
-                    console.log('Trying:', apiUrl);
-                    
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            url: videoUrl,
-                            videoQuality: '720',
-                            downloadMode: format === 'mp3' ? 'audio' : 'auto',
-                            audioFormat: 'mp3'
-                        })
-                    });
+            const response = await fetch(CONFIG.PROXY_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: videoUrl,
+                    downloadMode: format === 'mp3' ? 'audio' : 'auto'
+                })
+            });
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.text || `Server Error: ${response.status}`);
+            }
 
-                    const data = await response.json();
-                    console.log('Cobalt response:', data);
-                    
-                    if (data.status === 'error') {
-                        throw new Error(data.text || 'API Error');
-                    }
-                    
-                    // Extraer URL de descarga
-                    if (data.url) return data.url;
-                    if (data.status === 'redirect' || data.status === 'stream') return data.url;
-                    if (data.status === 'picker' && data.picker?.[0]?.url) return data.picker[0].url;
-                    
-                    throw new Error('No download URL');
-                    
-                } catch (err) {
-                    console.log('Instance failed:', instance, err.message);
-                    lastError = err;
-                }
+            const data = await response.json();
+            console.log('API response:', data);
+            
+            if (data.status === 'error') {
+                throw new Error(data.text || 'API Error');
             }
             
-            throw lastError || new Error('All instances failed');
+            if (data.url) return data.url;
+            
+            throw new Error('No download URL found');
         };
 
         // ========================================

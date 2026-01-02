@@ -1,4 +1,4 @@
-// api/proxy.js - Vercel Serverless Function con SaveFrom/Y2mate alternativo
+// api/proxy.js - Vercel Serverless con múltiples APIs
 export default async function handler(req, res) {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ status: 'error', text: 'No URL provided' });
     }
 
-    // Extraer video ID de la URL
+    // Extraer video ID
     const videoIdMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     if (!videoIdMatch) {
         return res.status(400).json({ status: 'error', text: 'Invalid YouTube URL' });
@@ -29,132 +29,112 @@ export default async function handler(req, res) {
 
     const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
-    // Intentar multiples APIs
-    const apis = [
-        tryY2mateIs,
-        trySsyoutube,
-        tryYtDownloader
+    // Intentar múltiples servicios
+    const services = [
+        () => tryLoaderTo(videoId, isAudio, userAgent),
+        () => trySaveFrom(videoId, isAudio, userAgent),
+        () => tryYtDl(videoId, isAudio, userAgent)
     ];
 
-    for (const apiFunc of apis) {
+    for (const service of services) {
         try {
-            const result = await apiFunc(videoId, isAudio, userAgent);
+            const result = await service();
             if (result && result.url) {
                 return res.status(200).json(result);
             }
         } catch (err) {
-            console.log(`API failed: ${err.message}`);
+            console.log(`Service failed: ${err.message}`);
         }
     }
 
     return res.status(503).json({
         status: 'error',
-        text: 'All download services are currently unavailable. Please try again later.'
+        text: 'All services unavailable. Try again later.'
     });
 }
 
-// API 1: y2mate.is (alternativo)
-async function tryY2mateIs(videoId, isAudio, userAgent) {
-    console.log('Trying y2mate.is...');
+// Loader.to API
+async function tryLoaderTo(videoId, isAudio, userAgent) {
+    console.log('Trying loader.to...');
     
-    // Paso 1: Analizar
-    const analyzeRes = await fetch('https://www.y2mate.is/mates/analyzeV2/ajax', {
+    const format = isAudio ? 'mp3' : 'mp4';
+    const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    // Paso 1: Iniciar conversión
+    const initRes = await fetch(`https://loader.to/ajax/download.php?format=${format}&url=${encodeURIComponent(ytUrl)}`, {
+        headers: { 'User-Agent': userAgent }
+    });
+    
+    if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
+    
+    const initData = await initRes.json();
+    if (!initData.success || !initData.id) throw new Error('Init failed');
+    
+    const downloadId = initData.id;
+    console.log('Loader.to ID:', downloadId);
+    
+    // Paso 2: Esperar a que termine (polling)
+    for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        
+        const progressRes = await fetch(`https://loader.to/ajax/progress.php?id=${downloadId}`, {
+            headers: { 'User-Agent': userAgent }
+        });
+        
+        if (!progressRes.ok) continue;
+        
+        const progress = await progressRes.json();
+        console.log('Progress:', progress.progress, '%');
+        
+        if (progress.success === 1 && progress.download_url) {
+            return {
+                status: 'success',
+                url: progress.download_url,
+                title: progress.title || 'video'
+            };
+        }
+        
+        if (progress.success === 0 && progress.progress === 0) {
+            throw new Error('Conversion failed');
+        }
+    }
+    
+    throw new Error('Timeout waiting for conversion');
+}
+
+// SaveFrom style API
+async function trySaveFrom(videoId, isAudio, userAgent) {
+    console.log('Trying savefrom...');
+    
+    const response = await fetch('https://worker.sf-tools.com/savefrom.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': userAgent,
-            'Origin': 'https://www.y2mate.is',
-            'Referer': 'https://www.y2mate.is/'
+            'Origin': 'https://savefrom.net',
+            'Referer': 'https://savefrom.net/'
         },
-        body: `k_query=https://www.youtube.com/watch?v=${videoId}&k_page=home&hl=en&q_auto=0`
-    });
-
-    if (!analyzeRes.ok) throw new Error(`HTTP ${analyzeRes.status}`);
-    
-    const data = await analyzeRes.json();
-    if (data.status !== 'ok') throw new Error(data.mess || 'Analysis failed');
-
-    // Buscar formato
-    const formats = isAudio ? data.links?.mp3 : data.links?.mp4;
-    if (!formats || Object.keys(formats).length === 0) {
-        throw new Error('No formats available');
-    }
-
-    // Obtener el mejor formato
-    let formatKey, quality;
-    if (isAudio) {
-        const keys = Object.keys(formats);
-        formatKey = formats[keys[0]].k;
-        quality = keys[0];
-    } else {
-        const priorities = ['720p', '480p', '360p', '1080p'];
-        for (const q of priorities) {
-            if (formats[q]) {
-                formatKey = formats[q].k;
-                quality = q;
-                break;
-            }
-        }
-        if (!formatKey) {
-            const keys = Object.keys(formats);
-            formatKey = formats[keys[0]].k;
-            quality = keys[0];
-        }
-    }
-
-    // Paso 2: Convertir
-    const convertRes = await fetch('https://www.y2mate.is/mates/convertV2/index', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': userAgent,
-            'Origin': 'https://www.y2mate.is',
-            'Referer': 'https://www.y2mate.is/'
-        },
-        body: `vid=${data.vid}&k=${encodeURIComponent(formatKey)}`
-    });
-
-    if (!convertRes.ok) throw new Error(`Convert HTTP ${convertRes.status}`);
-    
-    const convertData = await convertRes.json();
-    if (convertData.status !== 'ok' || !convertData.dlink) {
-        throw new Error('Conversion failed');
-    }
-
-    return {
-        status: 'success',
-        url: convertData.dlink,
-        title: data.title || 'video',
-        quality: quality
-    };
-}
-
-// API 2: ssyoutube.com
-async function trySsyoutube(videoId, isAudio, userAgent) {
-    console.log('Trying ssyoutube...');
-    
-    const response = await fetch(`https://api.ssyoutube.com/api/v1/?url=https://www.youtube.com/watch?v=${videoId}`, {
-        headers: {
-            'User-Agent': userAgent
-        }
+        body: `sf_url=https://www.youtube.com/watch?v=${videoId}&sf_submit=&new=1&lang=en&app=&country=en&os=Windows&browser=Chrome&channel=main&sm=0`
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
     const data = await response.json();
     
-    if (!data.formats || data.formats.length === 0) {
-        throw new Error('No formats');
+    if (!data || !data[0] || !data[0].url) {
+        throw new Error('No data received');
     }
 
-    // Buscar el formato adecuado
+    const videoData = data[0];
     let downloadUrl;
-    if (isAudio) {
-        const audio = data.formats.find(f => f.mimeType?.includes('audio'));
-        downloadUrl = audio?.url;
-    } else {
-        const video = data.formats.find(f => f.quality === '720p' || f.quality === '480p' || f.quality === '360p');
-        downloadUrl = video?.url || data.formats[0]?.url;
+    
+    if (isAudio && videoData.audio) {
+        downloadUrl = videoData.audio[0]?.url;
+    } else if (videoData.url) {
+        // Buscar calidad 720p o menor
+        const formats = videoData.url;
+        const preferred = formats.find(f => f.quality === '720p' || f.quality === '480p' || f.quality === '360p');
+        downloadUrl = preferred?.url || formats[0]?.url;
     }
 
     if (!downloadUrl) throw new Error('No download URL');
@@ -162,35 +142,29 @@ async function trySsyoutube(videoId, isAudio, userAgent) {
     return {
         status: 'success',
         url: downloadUrl,
-        title: data.title || 'video'
+        title: videoData.meta?.title || 'video'
     };
 }
 
-// API 3: yt-download.org style
-async function tryYtDownloader(videoId, isAudio, userAgent) {
-    console.log('Trying yt-downloader...');
+// YT-DL API alternativo
+async function tryYtDl(videoId, isAudio, userAgent) {
+    console.log('Trying yt-dl...');
     
-    const format = isAudio ? 'mp3' : 'mp4';
-    const response = await fetch('https://api.vevioz.com/api/button/' + format, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': userAgent
-        },
-        body: `url=https://www.youtube.com/watch?v=${videoId}`
+    const format = isAudio ? 'bestaudio' : 'best[height<=720]';
+    
+    const response = await fetch(`https://api.vevioz.com/@api/json/mp3/${videoId}`, {
+        headers: { 'User-Agent': userAgent }
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
-    const html = await response.text();
+    const data = await response.json();
     
-    // Extraer URL del HTML
-    const urlMatch = html.match(/href="(https:\/\/[^"]+\.(?:mp4|mp3|webm)[^"]*)"/i);
-    if (!urlMatch) throw new Error('No download link found');
+    if (!data.link) throw new Error('No link in response');
 
     return {
         status: 'success',
-        url: urlMatch[1],
-        title: 'video'
+        url: data.link,
+        title: data.title || 'video'
     };
 }
