@@ -1,4 +1,4 @@
-// api/proxy.js - Vercel Serverless con múltiples APIs
+// api/proxy.js - Vercel Serverless con APIs funcionando
 export default async function handler(req, res) {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,144 +27,172 @@ export default async function handler(req, res) {
     const videoId = videoIdMatch[1];
     const isAudio = downloadMode === 'audio';
 
-    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+    let lastError = '';
 
     // Intentar múltiples servicios
-    const services = [
-        () => tryLoaderTo(videoId, isAudio, userAgent),
-        () => trySaveFrom(videoId, isAudio, userAgent),
-        () => tryYtDl(videoId, isAudio, userAgent)
-    ];
-
-    for (const service of services) {
-        try {
-            const result = await service();
-            if (result && result.url) {
-                return res.status(200).json(result);
-            }
-        } catch (err) {
-            console.log(`Service failed: ${err.message}`);
+    try {
+        const result = await tryY2mateGuru(videoId, isAudio, userAgent);
+        if (result && result.url) {
+            return res.status(200).json(result);
         }
+    } catch (err) {
+        console.log('y2mate.guru failed:', err.message);
+        lastError = err.message;
+    }
+
+    try {
+        const result = await tryMp3Download(videoId, isAudio, userAgent);
+        if (result && result.url) {
+            return res.status(200).json(result);
+        }
+    } catch (err) {
+        console.log('mp3download failed:', err.message);
+        lastError = err.message;
+    }
+
+    try {
+        const result = await tryYtMp3(videoId, isAudio, userAgent);
+        if (result && result.url) {
+            return res.status(200).json(result);
+        }
+    } catch (err) {
+        console.log('ytmp3 failed:', err.message);
+        lastError = err.message;
     }
 
     return res.status(503).json({
         status: 'error',
-        text: 'All services unavailable. Try again later.'
+        text: 'Services unavailable: ' + lastError
     });
 }
 
-// Loader.to API
-async function tryLoaderTo(videoId, isAudio, userAgent) {
-    console.log('Trying loader.to...');
+// Y2mate.guru API
+async function tryY2mateGuru(videoId, isAudio, userAgent) {
+    console.log('Trying y2mate.guru...');
     
     const format = isAudio ? 'mp3' : 'mp4';
-    const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // Paso 1: Iniciar conversión
-    const initRes = await fetch(`https://loader.to/ajax/download.php?format=${format}&url=${encodeURIComponent(ytUrl)}`, {
-        headers: { 'User-Agent': userAgent }
+    // Paso 1: Analizar
+    const res1 = await fetch('https://www.y2mate.guru/api/convert', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': userAgent
+        },
+        body: JSON.stringify({
+            url: `https://www.youtube.com/watch?v=${videoId}`,
+            format: format
+        })
     });
+
+    if (!res1.ok) throw new Error(`HTTP ${res1.status}`);
     
-    if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
+    const data = await res1.json();
     
-    const initData = await initRes.json();
-    if (!initData.success || !initData.id) throw new Error('Init failed');
+    if (data.status === 'error') throw new Error(data.message || 'Conversion failed');
     
-    const downloadId = initData.id;
-    console.log('Loader.to ID:', downloadId);
-    
-    // Paso 2: Esperar a que termine (polling)
-    for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        
-        const progressRes = await fetch(`https://loader.to/ajax/progress.php?id=${downloadId}`, {
-            headers: { 'User-Agent': userAgent }
-        });
-        
-        if (!progressRes.ok) continue;
-        
-        const progress = await progressRes.json();
-        console.log('Progress:', progress.progress, '%');
-        
-        if (progress.success === 1 && progress.download_url) {
-            return {
-                status: 'success',
-                url: progress.download_url,
-                title: progress.title || 'video'
-            };
-        }
-        
-        if (progress.success === 0 && progress.progress === 0) {
-            throw new Error('Conversion failed');
-        }
+    if (data.url || data.downloadUrl) {
+        return {
+            status: 'success',
+            url: data.url || data.downloadUrl,
+            title: data.title || 'video'
+        };
     }
     
-    throw new Error('Timeout waiting for conversion');
+    throw new Error('No URL in response');
 }
 
-// SaveFrom style API
-async function trySaveFrom(videoId, isAudio, userAgent) {
-    console.log('Trying savefrom...');
+// MP3Download API
+async function tryMp3Download(videoId, isAudio, userAgent) {
+    console.log('Trying mp3download...');
     
-    const response = await fetch('https://worker.sf-tools.com/savefrom.php', {
+    const response = await fetch(`https://api.mp3download.to/v1/youtube/${videoId}`, {
+        headers: { 'User-Agent': userAgent }
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const data = await response.json();
+    
+    if (data.error) throw new Error(data.error);
+    
+    let downloadUrl = isAudio ? data.audio : data.video;
+    if (!downloadUrl && data.formats) {
+        const format = data.formats.find(f => isAudio ? f.type === 'audio' : f.type === 'video');
+        downloadUrl = format?.url;
+    }
+    
+    if (!downloadUrl) throw new Error('No format found');
+    
+    return {
+        status: 'success',
+        url: downloadUrl,
+        title: data.title || 'video'
+    };
+}
+
+// YTMP3 API simple
+async function tryYtMp3(videoId, isAudio, userAgent) {
+    console.log('Trying ytmp3...');
+    
+    // Usar una API pública de conversión
+    const format = isAudio ? 'mp3' : '360'; // 360p para video
+    const apiUrl = `https://yt1s.io/api/ajaxSearch/index`;
+    
+    const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': userAgent,
-            'Origin': 'https://savefrom.net',
-            'Referer': 'https://savefrom.net/'
+            'Origin': 'https://yt1s.io',
+            'Referer': 'https://yt1s.io/'
         },
-        body: `sf_url=https://www.youtube.com/watch?v=${videoId}&sf_submit=&new=1&lang=en&app=&country=en&os=Windows&browser=Chrome&channel=main&sm=0`
+        body: `q=https://www.youtube.com/watch?v=${videoId}&vt=mp3`
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
     const data = await response.json();
     
-    if (!data || !data[0] || !data[0].url) {
-        throw new Error('No data received');
+    if (data.status !== 'ok') throw new Error(data.mess || 'Failed');
+    
+    // Obtener el link de conversión
+    const vid = data.vid;
+    const links = isAudio ? data.links?.mp3 : data.links?.mp4;
+    
+    if (!links || Object.keys(links).length === 0) {
+        throw new Error('No links available');
     }
-
-    const videoData = data[0];
-    let downloadUrl;
     
-    if (isAudio && videoData.audio) {
-        downloadUrl = videoData.audio[0]?.url;
-    } else if (videoData.url) {
-        // Buscar calidad 720p o menor
-        const formats = videoData.url;
-        const preferred = formats.find(f => f.quality === '720p' || f.quality === '480p' || f.quality === '360p');
-        downloadUrl = preferred?.url || formats[0]?.url;
-    }
-
-    if (!downloadUrl) throw new Error('No download URL');
-
-    return {
-        status: 'success',
-        url: downloadUrl,
-        title: videoData.meta?.title || 'video'
-    };
-}
-
-// YT-DL API alternativo
-async function tryYtDl(videoId, isAudio, userAgent) {
-    console.log('Trying yt-dl...');
+    // Obtener el primer formato disponible
+    const firstKey = Object.keys(links)[0];
+    const formatData = links[firstKey];
     
-    const format = isAudio ? 'bestaudio' : 'best[height<=720]';
-    
-    const response = await fetch(`https://api.vevioz.com/@api/json/mp3/${videoId}`, {
-        headers: { 'User-Agent': userAgent }
+    // Paso 2: Obtener link de descarga
+    const convertRes = await fetch('https://yt1s.io/api/ajaxConvert/convert', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': userAgent,
+            'Origin': 'https://yt1s.io',
+            'Referer': 'https://yt1s.io/'
+        },
+        body: `vid=${vid}&k=${encodeURIComponent(formatData.k)}`
     });
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!convertRes.ok) throw new Error(`Convert HTTP ${convertRes.status}`);
     
-    const data = await response.json();
+    const convertData = await convertRes.json();
     
-    if (!data.link) throw new Error('No link in response');
+    if (convertData.status !== 'ok' || !convertData.dlink) {
+        throw new Error('Conversion failed');
+    }
 
     return {
         status: 'success',
-        url: data.link,
+        url: convertData.dlink,
         title: data.title || 'video'
     };
 }
