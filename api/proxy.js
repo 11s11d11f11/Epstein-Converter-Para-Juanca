@@ -86,12 +86,13 @@ async function startMP4Download(videoId, quality, res) {
         });
     }
     
-    // Devolver taskId para polling desde frontend
-    const taskIdResult = data.id || data.taskId || data.jobId;
+    // Devolver progressId para polling desde frontend
+    const taskIdResult = data.progressId || data.id || data.taskId || data.jobId;
     if (taskIdResult) {
         return res.status(200).json({
             status: 'processing',
             taskId: taskIdResult,
+            title: data.title || `video_${videoId}`,
             message: 'Video is being processed'
         });
     }
@@ -121,12 +122,22 @@ async function checkProgress(taskId, res) {
     const data = await progressRes.json();
     console.log('Progress response:', JSON.stringify(data));
     
-    // Si tiene URL lista
-    if (data.url || data.downloadUrl || data.link || data.file) {
+    // Si tiene URL lista (API devuelve downloadUrl)
+    if (data.downloadUrl || data.url || data.link || data.file) {
         return res.status(200).json({
             status: 'success',
-            url: data.url || data.downloadUrl || data.link || data.file,
+            url: data.downloadUrl || data.url || data.link || data.file,
             title: data.title || 'video'
+        });
+    }
+    
+    // Si finished es true pero no hay URL aun
+    if (data.finished === true && data.status === 'Finished') {
+        // Esperar, a veces tarda en generar URL
+        return res.status(200).json({
+            status: 'processing',
+            progress: 100,
+            message: 'Generating download link...'
         });
     }
     
@@ -138,10 +149,11 @@ async function checkProgress(taskId, res) {
         });
     }
     
-    // Aun procesando
+    // Aun procesando - progress viene en 0-1000
+    const progressPercent = data.progress ? Math.round(data.progress / 10) : 0;
     return res.status(200).json({
         status: 'processing',
-        progress: data.progress || 0,
+        progress: progressPercent,
         message: data.status || 'Processing...'
     });
 }
