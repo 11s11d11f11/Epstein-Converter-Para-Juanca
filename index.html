@@ -752,15 +752,16 @@
             }
 
             const data = await response.json();
-            console.log('Cobalt response:', data);
+            console.log('API response:', data);
             
             // Validar respuesta
             if (data.status === 'error') {
                 throw new Error(data.text || 'API Error');
             }
             
-            // Extraer URL de descarga
+            // Extraer URL de descarga (compatible con Y2mate y Cobalt)
             if (data.url) return data.url;
+            if (data.dlink) return data.dlink;
             if (data.picker && data.picker[0]) return data.picker[0].url;
             
             throw new Error('No download URL found');
