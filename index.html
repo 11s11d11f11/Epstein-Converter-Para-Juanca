@@ -643,11 +643,15 @@
         'use strict';
 
         // ========================================
-        // CONFIGURACION - Usa /api/proxy (Vercel)
+        // CONFIGURACION - Llamada DIRECTA a Cobalt
         // ========================================
         const CONFIG = {
-            // Serverless function en Vercel (o proxy.php en PHP hosting)
-            PROXY_URL: '/api/proxy',
+            // Instancias de Cobalt con CORS abierto (probar en orden)
+            COBALT_INSTANCES: [
+                'https://cobalt.perennialte.ch',
+                'https://cobalt.hypert.net',
+                'https://co.e96.one'
+            ],
             YT_REGEX: /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w\-]{11}/i
         };
 
@@ -727,44 +731,55 @@
         };
 
         // ========================================
-        // Llamar a Cobalt via TU proxy PHP
+        // Llamar DIRECTO a Cobalt (sin proxy)
         // ========================================
         const convertWithCobalt = async (videoUrl, format) => {
-            // Llamamos a TU propio archivo PHP en el servidor
-            // Mismo dominio = sin problemas de CORS
-            console.log('Connecting to backend proxy...');
+            let lastError = null;
             
-            const response = await fetch(CONFIG.PROXY_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    url: videoUrl,
-                    downloadMode: format === 'mp3' ? 'audio' : 'auto'
-                })
-            });
+            for (const instance of CONFIG.COBALT_INSTANCES) {
+                try {
+                    const apiUrl = instance + '/api/json';
+                    console.log('Trying:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            url: videoUrl,
+                            videoQuality: '720',
+                            downloadMode: format === 'mp3' ? 'audio' : 'auto',
+                            audioFormat: 'mp3'
+                        })
+                    });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Server error:', errorText);
-                throw new Error(`Server Error: ${response.status}`);
-            }
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
 
-            const data = await response.json();
-            console.log('API response:', data);
-            
-            // Validar respuesta
-            if (data.status === 'error') {
-                throw new Error(data.text || 'API Error');
+                    const data = await response.json();
+                    console.log('Cobalt response:', data);
+                    
+                    if (data.status === 'error') {
+                        throw new Error(data.text || 'API Error');
+                    }
+                    
+                    // Extraer URL de descarga
+                    if (data.url) return data.url;
+                    if (data.status === 'redirect' || data.status === 'stream') return data.url;
+                    if (data.status === 'picker' && data.picker?.[0]?.url) return data.picker[0].url;
+                    
+                    throw new Error('No download URL');
+                    
+                } catch (err) {
+                    console.log('Instance failed:', instance, err.message);
+                    lastError = err;
+                }
             }
             
-            // Extraer URL de descarga (compatible con Y2mate y Cobalt)
-            if (data.url) return data.url;
-            if (data.dlink) return data.dlink;
-            if (data.picker && data.picker[0]) return data.picker[0].url;
-            
-            throw new Error('No download URL found');
+            throw lastError || new Error('All instances failed');
         };
 
         // ========================================
