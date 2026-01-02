@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>El Conversor De Juanca | YouTube to MP4 & MP3 (Hecho Por Alex :P)</title>
+    <title>El Conversor De Juanca | YouTube to MP3 (Hecho Por Alex :P)</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -304,6 +304,41 @@
         .input-hint.error { color: var(--error); }
         .input-hint.success { color: var(--success); }
         .format-section { margin-bottom: 1.75rem; }
+        .format-display {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 180, 0, 0.08) 100%);
+            border: 2px solid var(--primary);
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.2);
+        }
+        .format-icon-large {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: var(--radius-sm);
+        }
+        .format-text {
+            display: flex;
+            flex-direction: column;
+        }
+        .format-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .format-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Space Grotesk', sans-serif;
+        }
         .format-tabs {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -518,8 +553,8 @@
     <main>
         <section class="hero">
             <div class="hero-badge">Ultra Fast Conversion</div>
-            <h1>YouTube to <span class="gradient-text">MP4 & MP3</span></h1>
-            <p>Professional converter with instant downloads. Paste your link and get your file in seconds.</p>
+            <h1>YouTube to <span class="gradient-text">MP3</span></h1>
+            <p>Professional audio converter with instant downloads. Paste your link and get your MP3 in seconds.</p>
         </section>
 
         <div class="converter-wrapper">
@@ -539,39 +574,20 @@
                 </div>
 
                 <div class="format-section">
-                    <label class="input-label">Output Format</label>
-                    <div class="format-tabs">
-                        <div class="format-tab">
-                            <input type="radio" name="format" id="formatMp4" value="mp4" checked>
-                            <label for="formatMp4">
-                                <div class="format-icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polygon points="5 3 19 12 5 21 5 3"/>
-                                    </svg>
-                                </div>
-                                <div class="format-info">
-                                    <span class="format-name">MP4</span>
-                                    <span class="format-desc">Video + Audio</span>
-                                </div>
-                            </label>
+                    <div class="format-display">
+                        <div class="format-icon-large">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 18V5l12-2v13"/>
+                                <circle cx="6" cy="18" r="3"/>
+                                <circle cx="18" cy="16" r="3"/>
+                            </svg>
                         </div>
-                        <div class="format-tab">
-                            <input type="radio" name="format" id="formatMp3" value="mp3">
-                            <label for="formatMp3">
-                                <div class="format-icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M9 18V5l12-2v13"/>
-                                        <circle cx="6" cy="18" r="3"/>
-                                        <circle cx="18" cy="16" r="3"/>
-                                    </svg>
-                                </div>
-                                <div class="format-info">
-                                    <span class="format-name">MP3</span>
-                                    <span class="format-desc">Audio Only</span>
-                                </div>
-                            </label>
+                        <div class="format-text">
+                            <span class="format-label">Output Format</span>
+                            <span class="format-value">MP3 Audio</span>
                         </div>
                     </div>
+                    <input type="hidden" id="formatMp3" value="mp3" checked>
                 </div>
 
                 <button id="convertBtn" class="convert-btn">
@@ -610,7 +626,7 @@
                     </svg>
                 </div>
                 <div class="feature-title">Lightning Fast</div>
-                <div class="feature-desc">Instant processing</div>
+                <div class="feature-desc">Instant processing, es decir, va mas o menos rapido jsjs</div>
             </div>
             <div class="feature-item">
                 <div class="feature-icon">
@@ -619,7 +635,7 @@
                     </svg>
                 </div>
                 <div class="feature-title">100% Secure</div>
-                <div class="feature-desc">No data stored</div>
+                <div class="feature-desc">No data stored rayao de mierda</div>
             </div>
             <div class="feature-item">
                 <div class="feature-icon">
@@ -628,8 +644,8 @@
                         <path d="M8 12h8"/>
                     </svg>
                 </div>
-                <div class="feature-title">No Limits gg</div>
-                <div class="feature-desc">Unlimited converts gg x2</div>
+                <div class="feature-title">No Limits</div>
+                <div class="feature-desc">Unlimited converts pa tu polla (creo q hay 200 descargas de limite yqs por el api q uso q si no me cobran guapeton)</div>
             </div>
         </div>
     </main>
@@ -658,8 +674,6 @@
             urlInput: $('urlInput'),
             pasteBtn: $('pasteBtn'),
             inputHint: $('inputHint'),
-            formatMp4: $('formatMp4'),
-            formatMp3: $('formatMp3'),
             convertBtn: $('convertBtn'),
             statusContainer: $('statusContainer'),
             statusBox: $('statusBox'),
@@ -678,7 +692,7 @@
         // Utility Functions
         // ========================================
         const isValidUrl = url => CONFIG.YT_REGEX.test(url);
-        const getFormat = () => els.formatMp4.checked ? 'mp4' : 'mp3';
+        const getFormat = () => 'mp3';
 
         const setInputState = (state, msg = '') => {
             els.urlInput.classList.remove('error', 'valid');
@@ -848,9 +862,6 @@
             els.urlInput.addEventListener('keypress', e => {
                 if (e.key === 'Enter' && !isProcessing) convert();
             });
-
-            els.formatMp4.addEventListener('change', hideStatus);
-            els.formatMp3.addEventListener('change', hideStatus);
         };
 
         if (document.readyState === 'loading') {

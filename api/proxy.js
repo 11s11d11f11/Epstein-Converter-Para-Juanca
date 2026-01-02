@@ -1,4 +1,4 @@
-// api/proxy.js - Vercel Serverless con YouTube Video FAST Downloader 24/7
+// api/proxy.js - Vercel Serverless - YouTube to MP3
 const RAPIDAPI_KEY = '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
 const API_HOST = 'youtube-video-fast-downloader-24-7.p.rapidapi.com';
 
@@ -16,13 +16,11 @@ export default async function handler(req, res) {
         return res.status(405).json({ status: 'error', text: 'Method not allowed' });
     }
 
-    const { url, downloadMode } = req.body;
+    const { url } = req.body;
 
     if (!url) {
         return res.status(400).json({ status: 'error', text: 'No URL provided' });
     }
-
-    const isAudio = downloadMode === 'audio';
     
     try {
         // Extraer video ID de la URL
@@ -31,9 +29,8 @@ export default async function handler(req, res) {
             throw new Error('Invalid YouTube URL');
         }
         const videoId = match[1];
-        const isShort = url.includes('/shorts/');
         
-        console.log('Video ID:', videoId, 'isAudio:', isAudio, 'isShort:', isShort);
+        console.log('Video ID:', videoId);
         
         // PASO 1: Obtener calidades disponibles
         const qualityRes = await fetch(`https://${API_HOST}/get_available_quality/${videoId}`, {
@@ -51,35 +48,17 @@ export default async function handler(req, res) {
         const qualities = await qualityRes.json();
         console.log('Available qualities:', JSON.stringify(qualities));
         
-        // Seleccionar la mejor calidad segun tipo
-        let selectedQuality;
-        if (isAudio) {
-            // Buscar audio
-            selectedQuality = qualities.find(q => q.type === 'audio');
-        } else {
-            // Buscar video, preferir 720p o 480p o la mejor disponible
-            const videoQualities = qualities.filter(q => q.type === 'video');
-            selectedQuality = videoQualities.find(q => q.quality === '720p') ||
-                              videoQualities.find(q => q.quality === '480p') ||
-                              videoQualities.find(q => q.quality === '360p') ||
-                              videoQualities[0];
-        }
+        // Buscar audio
+        const selectedQuality = qualities.find(q => q.type === 'audio');
         
         if (!selectedQuality) {
-            throw new Error('No suitable quality found');
+            throw new Error('No audio quality found');
         }
         
-        console.log('Selected quality:', selectedQuality.id, selectedQuality.quality);
+        console.log('Selected audio quality:', selectedQuality.id);
         
-        // PASO 2: Solicitar descarga
-        let downloadEndpoint;
-        if (isAudio) {
-            downloadEndpoint = `https://${API_HOST}/download_audio/${videoId}?quality=${selectedQuality.id}`;
-        } else if (isShort) {
-            downloadEndpoint = `https://${API_HOST}/download_short/${videoId}?quality=${selectedQuality.id}`;
-        } else {
-            downloadEndpoint = `https://${API_HOST}/download_video/${videoId}?quality=${selectedQuality.id}`;
-        }
+        // PASO 2: Solicitar descarga de audio
+        const downloadEndpoint = `https://${API_HOST}/download_audio/${videoId}?quality=${selectedQuality.id}`;
         
         console.log('Download endpoint:', downloadEndpoint);
         
@@ -108,8 +87,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
             status: 'success',
             url: fileUrl,
-            title: `video_${videoId}`,
-            quality: selectedQuality.quality
+            title: `audio_${videoId}`
         });
 
     } catch (err) {
