@@ -73,46 +73,90 @@ async function downloadMP4(videoId, res) {
     const downloadData = await downloadRes.json();
     console.log('MP4 response:', JSON.stringify(downloadData));
     
-    if (downloadData.url || downloadData.downloadUrl || downloadData.link) {
+    // Buscar URL en cualquier propiedad
+    const findUrl = (obj) => {
+        if (!obj) return null;
+        if (obj.url) return obj.url;
+        if (obj.downloadUrl) return obj.downloadUrl;
+        if (obj.link) return obj.link;
+        if (obj.file) return obj.file;
+        return null;
+    };
+    
+    let fileUrl = findUrl(downloadData);
+    if (fileUrl) {
         return res.status(200).json({
             status: 'success',
-            url: downloadData.url || downloadData.downloadUrl || downloadData.link,
+            url: fileUrl,
             title: downloadData.title || `video_${videoId}`
         });
     }
     
-    // Polling con /progress
-    const taskId = downloadData.id || downloadData.taskId || videoId;
+    // La API devuelve un ID para polling
+    const taskId = downloadData.id || downloadData.taskId || downloadData.jobId || videoId;
+    console.log('Task ID:', taskId);
     
-    for (let i = 0; i < 30; i++) {
+    // Polling con /progress - max 20 intentos (40 segundos)
+    for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 2000));
         
-        const progressRes = await fetch(`https://${MP4_API_HOST}/api/v1/progress?id=${taskId}`, {
-            headers: {
-                'X-RapidAPI-Key': RAPIDAPI_KEY,
-                'X-RapidAPI-Host': MP4_API_HOST
-            }
-        });
-        
-        if (!progressRes.ok) continue;
-        
-        const progressData = await progressRes.json();
-        console.log('Progress:', JSON.stringify(progressData));
-        
-        if (progressData.url || progressData.downloadUrl || progressData.link) {
-            return res.status(200).json({
-                status: 'success',
-                url: progressData.url || progressData.downloadUrl || progressData.link,
-                title: progressData.title || `video_${videoId}`
+        try {
+            const progressRes = await fetch(`https://${MP4_API_HOST}/api/v1/progress?id=${taskId}`, {
+                headers: {
+                    'X-RapidAPI-Key': RAPIDAPI_KEY,
+                    'X-RapidAPI-Host': MP4_API_HOST
+                }
             });
-        }
-        
-        if (progressData.error || progressData.status === 'error') {
-            throw new Error(progressData.error || 'Conversion failed');
+            
+            const progressText = await progressRes.text();
+            console.log('Progress raw:', progressText);
+            
+            if (!progressRes.ok) continue;
+            
+            const progressData = JSON.parse(progressText);
+            
+            // Buscar URL
+            fileUrl = findUrl(progressData);
+            if (fileUrl) {
+                return res.status(200).json({
+                    status: 'success',
+                    url: fileUrl,
+                    title: progressData.title || `video_${videoId}`
+                });
+            }
+            
+            // Verificar progreso
+            if (progressData.progress !== undefined) {
+                console.log('Progress %:', progressData.progress);
+                if (progressData.progress === 100) {
+                    // Esperar un poco más y buscar URL
+                    await new Promise(r => setTimeout(r, 2000));
+                    continue;
+                }
+            }
+            
+            // Verificar estado
+            if (progressData.status === 'completed' || progressData.status === 'done' || progressData.status === 'finished') {
+                fileUrl = findUrl(progressData);
+                if (fileUrl) {
+                    return res.status(200).json({
+                        status: 'success',
+                        url: fileUrl,
+                        title: progressData.title || `video_${videoId}`
+                    });
+                }
+            }
+            
+            if (progressData.error || progressData.status === 'error' || progressData.status === 'failed') {
+                throw new Error(progressData.error || progressData.message || 'Conversion failed');
+            }
+        } catch (e) {
+            if (e.message.includes('Conversion failed')) throw e;
+            console.log('Progress check error:', e.message);
         }
     }
     
-    throw new Error('Timeout');
+    throw new Error('Timeout - video may be too long or unavailable');
 }
 
 // MP3 con youtube-video-fast-downloader API
