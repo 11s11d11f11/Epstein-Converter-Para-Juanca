@@ -758,6 +758,35 @@
         };
 
         // ========================================
+        // Polling para verificar progreso
+        // ========================================
+        const pollProgress = async (taskId, maxAttempts = 30) => {
+            for (let i = 0; i < maxAttempts; i++) {
+                showStatus('loading', 'Processing...', `Converting video... (${Math.min((i + 1) * 5, 100)}%)`);
+                
+                await new Promise(r => setTimeout(r, 2000));
+                
+                const response = await fetch(CONFIG.PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'progress', taskId })
+                });
+                
+                const data = await response.json();
+                console.log('Progress:', data);
+                
+                if (data.status === 'success' && data.url) {
+                    return data.url;
+                }
+                
+                if (data.status === 'error') {
+                    throw new Error(data.text || 'Conversion failed');
+                }
+            }
+            throw new Error('Timeout - video may be too long');
+        };
+
+        // ========================================
         // Llamar al proxy de Vercel
         // ========================================
         const convertWithCobalt = async (videoUrl, format) => {
@@ -784,6 +813,17 @@
             
             if (data.status === 'error') {
                 throw new Error(data.text || 'API Error');
+            }
+            
+            // Si devuelve URL directa
+            if (data.status === 'success' && data.url) {
+                return data.url;
+            }
+            
+            // Si devuelve taskId, hacer polling desde frontend
+            if (data.status === 'processing' && data.taskId) {
+                console.log('Polling for task:', data.taskId);
+                return await pollProgress(data.taskId);
             }
             
             if (data.url) return data.url;
