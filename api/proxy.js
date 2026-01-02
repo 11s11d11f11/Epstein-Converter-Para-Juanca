@@ -19,12 +19,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ status: 'error', text: 'No URL provided' });
     }
 
-    // Instancias de Cobalt (las mas abiertas primero)
+    // Mas instancias de Cobalt - algunas privadas/menos conocidas
     const cobaltInstances = [
         'https://cobalt.perennialte.ch/api/json',
         'https://cobalt.hypert.net/api/json',
         'https://co.e96.one/api/json',
-        'https://api.cobalt.tools/api/json'
+        'https://cobalt-api.kwiatekmiki.com/api/json',
+        'https://cobalt.canine.tools/api/json',
+        'https://cobalt.lostdusty.win/api/json'
     ];
 
     const payload = {
@@ -35,9 +37,12 @@ export default async function handler(req, res) {
         filenamePattern: 'basic'
     };
 
+    // User agents variados
     const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36'
     ];
     const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
 
@@ -48,17 +53,21 @@ export default async function handler(req, res) {
         try {
             console.log('Trying:', instance);
             
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            
             const response = await fetch(instance, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'User-Agent': randomUA,
-                    'Origin': 'https://cobalt.tools',
-                    'Referer': 'https://cobalt.tools/'
+                    'User-Agent': randomUA
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeout);
 
             if (response.ok) {
                 const data = await response.json();
