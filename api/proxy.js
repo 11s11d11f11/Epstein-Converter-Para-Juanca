@@ -1,6 +1,9 @@
 // api/proxy.js - Vercel Serverless - YouTube to MP3/MP4
 const RAPIDAPI_KEY = '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
-const API_HOST = 'youtube-mp41.p.rapidapi.com';
+
+// APIs separadas
+const MP3_API_HOST = 'youtube-video-fast-downloader-24-7.p.rapidapi.com';
+const MP4_API_HOST = 'youtube-mp41.p.rapidapi.com';
 
 export default async function handler(req, res) {
     // CORS headers
@@ -34,87 +37,11 @@ export default async function handler(req, res) {
         
         console.log('Video ID:', videoId, 'Mode:', isVideo ? 'MP4' : 'MP3');
         
-        // Usar youtube-mp41 API para ambos
-        // format=mp4 para video, format=mp3 para audio
-        const format = isVideo ? 'mp4' : 'mp3';
-        const quality = isVideo ? '720' : '128';
-        
-        // PASO 1: Iniciar descarga
-        const downloadUrl = `https://${API_HOST}/api/v1/download?id=${videoId}&format=${format}&quality=${quality}`;
-        console.log('Download URL:', downloadUrl);
-        
-        const downloadRes = await fetch(downloadUrl, {
-            headers: {
-                'X-RapidAPI-Key': RAPIDAPI_KEY,
-                'X-RapidAPI-Host': API_HOST
-            }
-        });
-        
-        if (!downloadRes.ok) {
-            const errText = await downloadRes.text();
-            throw new Error(`API error ${downloadRes.status}: ${errText}`);
+        if (isVideo) {
+            return await downloadMP4(videoId, res);
+        } else {
+            return await downloadMP3(videoId, res);
         }
-        
-        const downloadData = await downloadRes.json();
-        console.log('Download response:', JSON.stringify(downloadData));
-        
-        // Si ya tiene URL de descarga directa
-        if (downloadData.url || downloadData.downloadUrl || downloadData.link) {
-            return res.status(200).json({
-                status: 'success',
-                url: downloadData.url || downloadData.downloadUrl || downloadData.link,
-                title: downloadData.title || `${format}_${videoId}`
-            });
-        }
-        
-        // Si tiene ID, hacer polling con /progress
-        const taskId = downloadData.id || downloadData.taskId || videoId;
-        console.log('Task ID for polling:', taskId);
-        
-        // PASO 2: Polling para esperar resultado
-        for (let i = 0; i < 30; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            
-            const progressUrl = `https://${API_HOST}/api/v1/progress?id=${taskId}`;
-            const progressRes = await fetch(progressUrl, {
-                headers: {
-                    'X-RapidAPI-Key': RAPIDAPI_KEY,
-                    'X-RapidAPI-Host': API_HOST
-                }
-            });
-            
-            if (!progressRes.ok) continue;
-            
-            const progressData = await progressRes.json();
-            console.log('Progress:', JSON.stringify(progressData));
-            
-            // Verificar si está listo
-            if (progressData.url || progressData.downloadUrl || progressData.link) {
-                return res.status(200).json({
-                    status: 'success',
-                    url: progressData.url || progressData.downloadUrl || progressData.link,
-                    title: progressData.title || `${format}_${videoId}`
-                });
-            }
-            
-            // Si hay progreso, verificar si completó
-            if (progressData.progress === 100 || progressData.status === 'completed' || progressData.status === 'done') {
-                if (progressData.url || progressData.downloadUrl) {
-                    return res.status(200).json({
-                        status: 'success',
-                        url: progressData.url || progressData.downloadUrl,
-                        title: progressData.title || `${format}_${videoId}`
-                    });
-                }
-            }
-            
-            // Si hay error
-            if (progressData.error || progressData.status === 'error' || progressData.status === 'failed') {
-                throw new Error(progressData.error || 'Conversion failed');
-            }
-        }
-        
-        throw new Error('Timeout waiting for conversion');
 
     } catch (err) {
         console.error('Error:', err.message);
@@ -123,4 +50,136 @@ export default async function handler(req, res) {
             text: err.message
         });
     }
+}
+
+// MP4 con youtube-mp41 API
+async function downloadMP4(videoId, res) {
+    const downloadUrl = `https://${MP4_API_HOST}/api/v1/download?id=${videoId}&format=720`;
+    console.log('MP4 Download URL:', downloadUrl);
+    
+    const downloadRes = await fetch(downloadUrl, {
+        headers: {
+            'X-RapidAPI-Key': RAPIDAPI_KEY,
+            'X-RapidAPI-Host': MP4_API_HOST
+        }
+    });
+    
+    if (!downloadRes.ok) {
+        const errText = await downloadRes.text();
+        throw new Error(`MP4 API error ${downloadRes.status}: ${errText}`);
+    }
+    
+    const downloadData = await downloadRes.json();
+    console.log('MP4 response:', JSON.stringify(downloadData));
+    
+    if (downloadData.url || downloadData.downloadUrl || downloadData.link) {
+        return res.status(200).json({
+            status: 'success',
+            url: downloadData.url || downloadData.downloadUrl || downloadData.link,
+            title: downloadData.title || `video_${videoId}`
+        });
+    }
+    
+    // Polling con /progress
+    const taskId = downloadData.id || downloadData.taskId || videoId;
+    
+    for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        
+        const progressRes = await fetch(`https://${MP4_API_HOST}/api/v1/progress?id=${taskId}`, {
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEY,
+                'X-RapidAPI-Host': MP4_API_HOST
+            }
+        });
+        
+        if (!progressRes.ok) continue;
+        
+        const progressData = await progressRes.json();
+        console.log('Progress:', JSON.stringify(progressData));
+        
+        if (progressData.url || progressData.downloadUrl || progressData.link) {
+            return res.status(200).json({
+                status: 'success',
+                url: progressData.url || progressData.downloadUrl || progressData.link,
+                title: progressData.title || `video_${videoId}`
+            });
+        }
+        
+        if (progressData.error || progressData.status === 'error') {
+            throw new Error(progressData.error || 'Conversion failed');
+        }
+    }
+    
+    throw new Error('Timeout');
+}
+
+// MP3 con youtube-video-fast-downloader API
+async function downloadMP3(videoId, res) {
+    // Paso 1: Obtener calidades
+    const qualityRes = await fetch(`https://${MP3_API_HOST}/get_available_quality/${videoId}`, {
+        headers: {
+            'X-RapidAPI-Key': RAPIDAPI_KEY,
+            'X-RapidAPI-Host': MP3_API_HOST
+        }
+    });
+    
+    if (!qualityRes.ok) {
+        const errText = await qualityRes.text();
+        throw new Error(`Quality API error ${qualityRes.status}: ${errText}`);
+    }
+    
+    const qualities = await qualityRes.json();
+    const audioQuality = qualities.find(q => q.type === 'audio');
+    
+    if (!audioQuality) {
+        throw new Error('No audio quality found');
+    }
+    
+    console.log('Audio quality:', audioQuality.id);
+    
+    // Paso 2: Descargar audio
+    const downloadRes = await fetch(`https://${MP3_API_HOST}/download_audio/${videoId}?quality=${audioQuality.id}`, {
+        headers: {
+            'X-RapidAPI-Key': RAPIDAPI_KEY,
+            'X-RapidAPI-Host': MP3_API_HOST
+        }
+    });
+    
+    if (!downloadRes.ok) {
+        const errText = await downloadRes.text();
+        throw new Error(`Download API error ${downloadRes.status}: ${errText}`);
+    }
+    
+    const downloadData = await downloadRes.json();
+    console.log('MP3 response:', JSON.stringify(downloadData));
+    
+    if (!downloadData.file) {
+        throw new Error('No file URL');
+    }
+    
+    // Paso 3: Esperar que el archivo esté listo
+    for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        
+        try {
+            const check = await fetch(downloadData.file, { method: 'HEAD' });
+            if (check.ok) {
+                return res.status(200).json({
+                    status: 'success',
+                    url: downloadData.file,
+                    title: `audio_${videoId}`
+                });
+            }
+        } catch (e) {
+            console.log('File not ready yet');
+        }
+    }
+    
+    // Devolver URL de todas formas
+    return res.status(200).json({
+        status: 'success',
+        url: downloadData.file,
+        title: `audio_${videoId}`
+    });
 }
