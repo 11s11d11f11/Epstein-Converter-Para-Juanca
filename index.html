@@ -760,16 +760,17 @@
         // ========================================
         // Polling para verificar progreso
         // ========================================
-        const pollProgress = async (taskId, maxAttempts = 30) => {
+        const pollProgress = async (taskId, taskType = 'mp4', maxAttempts = 30) => {
+            const label = taskType === 'mp3' ? 'audio' : 'video';
             for (let i = 0; i < maxAttempts; i++) {
-                showStatus('loading', 'Processing...', `Converting video... (${Math.min((i + 1) * 5, 100)}%)`);
+                showStatus('loading', 'Processing...', `Converting ${label}... (${Math.min((i + 1) * 5, 100)}%)`);
                 
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 1000));
                 
                 const response = await fetch(CONFIG.PROXY_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'progress', taskId })
+                    body: JSON.stringify({ action: 'progress', taskId, taskType })
                 });
                 
                 const data = await response.json();
@@ -783,7 +784,7 @@
                     throw new Error(data.text || 'Conversion failed');
                 }
             }
-            throw new Error('Timeout - video may be too long');
+            throw new Error('Timeout - file may be too long');
         };
 
         // ========================================
@@ -822,8 +823,8 @@
             
             // Si devuelve taskId, hacer polling desde frontend
             if (data.status === 'processing' && data.taskId) {
-                console.log('Polling for task:', data.taskId);
-                return await pollProgress(data.taskId);
+                console.log('Polling for task:', data.taskId, 'type:', data.taskType);
+                return await pollProgress(data.taskId, data.taskType || 'mp4');
             }
             
             if (data.url) return data.url;

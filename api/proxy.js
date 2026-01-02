@@ -2,7 +2,7 @@
 const RAPIDAPI_KEY = '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
 
 // APIs
-const MP3_API_HOST = 'youtube-video-fast-downloader-24-7.p.rapidapi.com';
+const MP3_API_HOST = 'youtube-mp36.p.rapidapi.com';
 const MP4_API_HOST = 'youtube-mp41.p.rapidapi.com';
 
 export default async function handler(req, res) {
@@ -19,12 +19,12 @@ export default async function handler(req, res) {
         return res.status(405).json({ status: 'error', text: 'Method not allowed' });
     }
 
-    const { url, downloadMode, quality, action, taskId } = req.body;
+    const { url, downloadMode, quality, action, taskId, taskType } = req.body;
 
     try {
         // Si es una peticion de progreso
         if (action === 'progress' && taskId) {
-            return await checkProgress(taskId, res);
+            return await checkProgress(taskId, taskType, res);
         }
 
         if (!url) {
@@ -101,9 +101,43 @@ async function startMP4Download(videoId, quality, res) {
 }
 
 // Verificar progreso de tarea - llamado por frontend
-async function checkProgress(taskId, res) {
-    console.log('Checking progress for:', taskId);
+async function checkProgress(taskId, taskType, res) {
+    console.log('Checking progress for:', taskId, 'type:', taskType);
     
+    // Si es MP3, usar la API de MP3
+    if (taskType === 'mp3') {
+        const response = await fetch(`https://${MP3_API_HOST}/dl?id=${taskId}`, {
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEY,
+                'X-RapidAPI-Host': MP3_API_HOST
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'ok' && data.link) {
+            return res.status(200).json({
+                status: 'success',
+                url: data.link,
+                title: data.title || 'audio'
+            });
+        }
+        
+        if (data.status === 'fail') {
+            return res.status(200).json({
+                status: 'error',
+                text: data.msg || 'MP3 conversion failed'
+            });
+        }
+        
+        return res.status(200).json({
+            status: 'processing',
+            progress: data.progress || 0,
+            message: 'Converting audio...'
+        });
+    }
+    
+    // MP4 - usar API de MP4
     const progressRes = await fetch(`https://${MP4_API_HOST}/api/v1/progress?id=${taskId}`, {
         headers: {
             'X-RapidAPI-Key': RAPIDAPI_KEY,
@@ -158,54 +192,49 @@ async function checkProgress(taskId, res) {
     });
 }
 
-// Descargar MP3 directamente
+// Descargar MP3 - API rapida youtube-mp36
 async function downloadMP3(videoId, res) {
-    // Paso 1: Obtener calidades disponibles
-    const qualityRes = await fetch(`https://${MP3_API_HOST}/get_available_quality/${videoId}`, {
+    const apiUrl = `https://${MP3_API_HOST}/dl?id=${videoId}`;
+    console.log('MP3 API URL:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
         headers: {
             'X-RapidAPI-Key': RAPIDAPI_KEY,
             'X-RapidAPI-Host': MP3_API_HOST
         }
     });
     
-    if (!qualityRes.ok) {
-        const errText = await qualityRes.text();
-        throw new Error(`Quality API error ${qualityRes.status}: ${errText}`);
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`MP3 API error ${response.status}: ${errText}`);
     }
     
-    const qualities = await qualityRes.json();
-    const audioQuality = qualities.find(q => q.type === 'audio');
+    const data = await response.json();
+    console.log('MP3 response:', JSON.stringify(data));
     
-    if (!audioQuality) {
-        throw new Error('No audio quality available');
+    // Si status es "ok" y tiene link
+    if (data.status === 'ok' && data.link) {
+        return res.status(200).json({
+            status: 'success',
+            url: data.link,
+            title: data.title || `audio_${videoId}`
+        });
     }
     
-    console.log('Audio quality:', audioQuality.id);
-    
-    // Paso 2: Obtener URL de descarga
-    const downloadRes = await fetch(`https://${MP3_API_HOST}/download_audio/${videoId}?quality=${audioQuality.id}`, {
-        headers: {
-            'X-RapidAPI-Key': RAPIDAPI_KEY,
-            'X-RapidAPI-Host': MP3_API_HOST
-        }
-    });
-    
-    if (!downloadRes.ok) {
-        const errText = await downloadRes.text();
-        throw new Error(`Download API error ${downloadRes.status}: ${errText}`);
+    // Si status es "processing", devolver para polling
+    if (data.status === 'processing') {
+        return res.status(200).json({
+            status: 'processing',
+            taskId: videoId,
+            taskType: 'mp3',
+            message: 'Converting audio...'
+        });
     }
     
-    const downloadData = await downloadRes.json();
-    console.log('MP3 response:', JSON.stringify(downloadData));
-    
-    if (!downloadData.file) {
-        throw new Error('No file URL received');
+    // Si fallo
+    if (data.status === 'fail') {
+        throw new Error(data.msg || 'MP3 conversion failed');
     }
     
-    // Devolver URL directamente
-    return res.status(200).json({
-        status: 'success',
-        url: downloadData.file,
-        title: `audio_${videoId}`
-    });
+    throw new Error('No MP3 link received');
 }
