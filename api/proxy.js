@@ -21,16 +21,9 @@ export default async function handler(req, res) {
 
     const isAudio = downloadMode === 'audio';
     
-    // RapidAPI Key - REEMPLAZA CON TU KEY DE RAPIDAPI
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || 'TU_API_KEY_AQUI';
+    // RapidAPI Key
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '0992c616bamsh5e52d07ff445561p12b1c0jsnd31fd982e16f';
     
-    if (RAPIDAPI_KEY === 'TU_API_KEY_AQUI') {
-        return res.status(500).json({ 
-            status: 'error', 
-            text: 'API key not configured. Add RAPIDAPI_KEY to Vercel environment variables.' 
-        });
-    }
-
     try {
         console.log('Calling RapidAPI...');
         
