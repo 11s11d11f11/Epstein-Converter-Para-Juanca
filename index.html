@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Conversor De Juanca | YouTube to MP4 & MP3 (Hecho Por Alex :P)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FFD700;
+            --primary-light: #FFEB3B;
+            --primary-dark: #FFA000;
+            --primary-glow: rgba(255, 215, 0, 0.6);
+            --bg-dark: #050508;
+            --glass-bg: rgba(10, 10, 14, 0.75);
+            --glass-border: rgba(255, 215, 0, 0.12);
+            --glass-border-hover: rgba(255, 215, 0, 0.35);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --success: #00E676;
+            --error: #FF5252;
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+            --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-normal: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+        .bg-effects {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+        .glow-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.5;
+            animation: orbFloat 25s ease-in-out infinite;
+        }
+        .glow-orb-1 {
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            top: -300px;
+            left: -200px;
+        }
+        .glow-orb-2 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255, 180, 0, 0.4) 0%, transparent 70%);
+            bottom: -200px;
+            right: -200px;
+            animation-delay: -10s;
+        }
+        .glow-orb-3 {
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.25) 0%, transparent 70%);
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -5s;
+        }
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+            25% { transform: translate(50px, -50px) scale(1.1); opacity: 0.6; }
+            50% { transform: translate(-30px, 30px) scale(0.9); opacity: 0.4; }
+            75% { transform: translate(-50px, -30px) scale(1.05); opacity: 0.55; }
+        }
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255, 215, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 215, 0, 0.03) 1px, transparent 1px);
+            background-size: 80px 80px;
+            mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+        }
+        .noise-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+                0 1px 0 rgba(255, 255, 255, 0.1) inset;
+            transition: all var(--transition-normal);
+        }
+        .glass-card:hover {
+            border-color: var(--glass-border-hover);
+            box-shadow: 
+                0 30px 60px -15px rgba(0, 0, 0, 0.6),
+                0 0 80px rgba(255, 215, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+        }
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: 1.25rem 0;
+            background: rgba(5, 5, 8, 0.85);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-bottom: 1px solid rgba(255, 215, 0, 0.08);
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3);
+        }
+        .logo-icon svg { width: 24px; height: 24px; color: #000; }
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .logo-text .accent {
+            color: var(--primary);
+            text-shadow: 0 0 30px var(--primary-glow);
+        }
+        .nav-badge {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #000;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        main {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8rem 1.5rem 4rem;
+        }
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+            max-width: 700px;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 100px;
+            padding: 0.5rem 1.25rem;
+            font-size: 0.85rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+        }
+        .hero-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2.5rem, 7vw, 4.5rem);
+            font-weight: 700;
+            letter-spacing: -2px;
+            line-height: 1.1;
+            margin-bottom: 1.25rem;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, var(--primary) 0%, #FFF 50%, var(--primary) 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+        .converter-wrapper { width: 100%; max-width: 580px; }
+        .converter-card { padding: 2.5rem; position: relative; overflow: hidden; }
+        .converter-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+        }
+        .input-group { position: relative; margin-bottom: 1.75rem; }
+        .input-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        .url-input {
+            width: 100%;
+            padding: 1.15rem 3.5rem 1.15rem 1.25rem;
+            font-size: 1rem;
+            font-family: inherit;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 215, 0, 0.1);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            transition: all var(--transition-normal);
+            outline: none;
+        }
+        .url-input::placeholder { color: var(--text-muted); }
+        .url-input:focus {
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.6);
+            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.1), 0 0 40px rgba(255, 215, 0, 0.15);
+        }
+        .url-input.error { border-color: var(--error); box-shadow: 0 0 0 4px rgba(255, 82, 82, 0.1); }
+        .url-input.valid { border-color: var(--success); }
+        .paste-btn {
+            position: absolute;
+            right: 0.75rem;
+            background: rgba(255, 215, 0, 0.1);
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            padding: 0.6rem;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .paste-btn:hover { background: rgba(255, 215, 0, 0.2); transform: scale(1.05); }
+        .input-hint {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.6rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            min-height: 1.2rem;
+        }
+        .input-hint.error { color: var(--error); }
+        .input-hint.success { color: var(--success); }
+        .format-section { margin-bottom: 1.75rem; }
+        .format-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.5rem;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .format-tab { position: relative; }
+        .format-tab input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .format-tab label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: transparent;
+            border: 2px solid transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .format-tab input:checked + label {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: #000;
+            border-color: var(--primary);
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.35);
+        }
+        .format-tab label:hover { background: rgba(255, 215, 0, 0.08); border-color: rgba(255, 215, 0, 0.2); }
+        .format-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+        .format-info { display: flex; flex-direction: column; align-items: flex-start; }
+        .format-name { font-size: 1rem; font-weight: 700; }
+        .format-desc { font-size: 0.7rem; opacity: 0.7; }
+        .convert-btn {
+            width: 100%;
+            padding: 1.25rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            border-radius: var(--radius-md);
+            color: #000;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .convert-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.6s ease;
+        }
+        .convert-btn:hover:not(:disabled)::before { left: 100%; }
+        .convert-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(255, 215, 0, 0.5), 0 0 100px rgba(255, 215, 0, 0.3);
+        }
+        .convert-btn:active:not(:disabled) { transform: translateY(-1px); }
+        .convert-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .convert-btn.loading .btn-text { display: none; }
+        .convert-btn.loading .btn-loader { display: flex; }
+        .btn-loader { display: none; align-items: center; gap: 0.5rem; }
+        .spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid rgba(0, 0, 0, 0.2);
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-container { margin-top: 1.5rem; display: none; }
+        .status-container.active { display: block; }
+        .status-box {
+            padding: 1.25rem;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            animation: fadeSlideIn 0.4s ease;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .status-loading { background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.2); }
+        .status-success { background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); }
+        .status-error { background: rgba(255, 82, 82, 0.08); border: 1px solid rgba(255, 82, 82, 0.2); }
+        .status-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .status-loading .status-icon { background: rgba(255, 215, 0, 0.15); color: var(--primary); }
+        .status-success .status-icon { background: rgba(0, 230, 118, 0.15); color: var(--success); }
+        .status-error .status-icon { background: rgba(255, 82, 82, 0.15); color: var(--error); }
+        .status-content { flex: 1; }
+        .status-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
+        .status-message { font-size: 0.85rem; color: var(--text-secondary); }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.85rem 1.5rem;
+            background: var(--success);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #000;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            margin-left: auto;
+        }
+        .download-btn:hover {
+            background: #00ff88;
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 230, 118, 0.4);
+        }
+        .features {
+            margin-top: 4rem;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            max-width: 580px;
+            width: 100%;
+        }
+        .feature-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            text-align: center;
+            transition: all var(--transition-normal);
+        }
+        .feature-item:hover { background: rgba(255, 215, 0, 0.05); border-color: rgba(255, 215, 0, 0.15); }
+        .feature-icon { color: var(--primary); margin-bottom: 0.25rem; }
+        .feature-title { font-weight: 600; font-size: 0.9rem; }
+        .feature-desc { font-size: 0.75rem; color: var(--text-muted); }
+        footer {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin-top: auto;
+        }
+        @media (max-width: 640px) {
+            main { padding: 7rem 1rem 3rem; }
+            .converter-card { padding: 1.75rem; }
+            .hero h1 { letter-spacing: -1px; }
+            .format-tab label { padding: 0.85rem 1rem; flex-direction: column; gap: 0.5rem; }
+            .format-info { align-items: center; text-align: center; }
+            .features { grid-template-columns: 1fr; }
+            .status-box { flex-direction: column; text-align: center; }
+            .download-btn { margin: 0.75rem auto 0; }
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 215, 0, 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 215, 0, 0.5); }
+        ::selection { background: rgba(255, 215, 0, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="bg-effects">
+        <div class="glow-orb glow-orb-1"></div>
+        <div class="glow-orb glow-orb-2"></div>
+        <div class="glow-orb glow-orb-3"></div>
+        <div class="grid-pattern"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                </div>
+                <span class="logo-text">El Conversor de <span class="accent">Epstein (Juanca)</span></span>
+                <span class="nav-badge">Hecho Por Alex :P</span>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="hero-badge">Ultra Fast Conversion</div>
+            <h1>YouTube to <span class="gradient-text">MP4 & MP3</span></h1>
+            <p>Professional converter with instant downloads. Paste your link and get your file in seconds.</p>
+        </section>
+
+        <div class="converter-wrapper">
+            <div class="converter-card glass-card">
+                <div class="input-group">
+                    <label class="input-label">YouTube URL</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="urlInput" class="url-input" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+                        <button id="pasteBtn" class="paste-btn" title="Paste from clipboard">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-hint" id="inputHint"></div>
+                </div>
+
+                <div class="format-section">
+                    <label class="input-label">Output Format</label>
+                    <div class="format-tabs">
+                        <div class="format-tab">
+                            <input type="radio" name="format" id="formatMp4" value="mp4" checked>
+                            <label for="formatMp4">
+                                <div class="format-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                </div>
+                                <div class="format-info">
+                                    <span class="format-name">MP4</span>
+                                    <span class="format-desc">Video + Audio</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="format-tab">
+                            <input type="radio" name="format" id="formatMp3" value="mp3">
+                            <label for="formatMp3">
+                                <div class="format-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M9 18V5l12-2v13"/>
+                                        <circle cx="6" cy="18" r="3"/>
+                                        <circle cx="18" cy="16" r="3"/>
+                                    </svg>
+                                </div>
+                                <div class="format-info">
+                                    <span class="format-name">MP3</span>
+                                    <span class="format-desc">Audio Only</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="convertBtn" class="convert-btn">
+                    <span class="btn-text">Convert Now</span>
+                    <span class="btn-loader">
+                        <span class="spinner"></span>
+                        <span>Processing...</span>
+                    </span>
+                </button>
+
+                <div class="status-container" id="statusContainer">
+                    <div class="status-box" id="statusBox">
+                        <div class="status-icon" id="statusIcon"></div>
+                        <div class="status-content">
+                            <div class="status-title" id="statusTitle"></div>
+                            <div class="status-message" id="statusMessage"></div>
+                        </div>
+                        <a href="#" class="download-btn" id="downloadBtn" style="display: none;" target="_blank" rel="noopener">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                </div>
+                <div class="feature-title">Lightning Fast</div>
+                <div class="feature-desc">Instant processing</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                </div>
+                <div class="feature-title">100% Secure</div>
+                <div class="feature-desc">No data stored</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 12h8"/>
+                    </svg>
+                </div>
+                <div class="feature-title">No Limits gg</div>
+                <div class="feature-desc">Unlimited converts gg x2</div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>For personal use only eh juanca q te veo. Respect copyright laws.</p>
+    </footer>
+
+    <script>
+    (function() {
+        'use strict';
+
+        // ========================================
+        // CONFIGURACION - Usa /api/proxy (Vercel)
+        // ========================================
+        const CONFIG = {
+            // Serverless function en Vercel (o proxy.php en PHP hosting)
+            PROXY_URL: '/api/proxy',
+            YT_REGEX: /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w\-]{11}/i
+        };
+
+        // ========================================
+        // DOM Elements
+        // ========================================
+        const $ = id => document.getElementById(id);
+        const els = {
+            urlInput: $('urlInput'),
+            pasteBtn: $('pasteBtn'),
+            inputHint: $('inputHint'),
+            formatMp4: $('formatMp4'),
+            formatMp3: $('formatMp3'),
+            convertBtn: $('convertBtn'),
+            statusContainer: $('statusContainer'),
+            statusBox: $('statusBox'),
+            statusIcon: $('statusIcon'),
+            statusTitle: $('statusTitle'),
+            statusMessage: $('statusMessage'),
+            downloadBtn: $('downloadBtn')
+        };
+
+        // ========================================
+        // State
+        // ========================================
+        let isProcessing = false;
+
+        // ========================================
+        // Utility Functions
+        // ========================================
+        const isValidUrl = url => CONFIG.YT_REGEX.test(url);
+        const getFormat = () => els.formatMp4.checked ? 'mp4' : 'mp3';
+
+        const setInputState = (state, msg = '') => {
+            els.urlInput.classList.remove('error', 'valid');
+            els.inputHint.classList.remove('error', 'success');
+            if (state === 'error') {
+                els.urlInput.classList.add('error');
+                els.inputHint.classList.add('error');
+            } else if (state === 'success') {
+                els.urlInput.classList.add('valid');
+                els.inputHint.classList.add('success');
+            }
+            els.inputHint.textContent = msg;
+        };
+
+        const setLoading = loading => {
+            isProcessing = loading;
+            els.convertBtn.disabled = loading;
+            els.convertBtn.classList.toggle('loading', loading);
+        };
+
+        const showStatus = (type, title, message, showDownload = false, downloadUrl = '') => {
+            els.statusContainer.classList.add('active');
+            els.statusBox.className = 'status-box status-' + type;
+            
+            const icons = {
+                loading: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+                success: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+                error: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+            };
+            
+            els.statusIcon.innerHTML = icons[type] || icons.loading;
+            els.statusTitle.textContent = title;
+            els.statusMessage.textContent = message;
+            
+            if (showDownload && downloadUrl) {
+                els.downloadBtn.href = downloadUrl;
+                els.downloadBtn.style.display = 'inline-flex';
+            } else {
+                els.downloadBtn.style.display = 'none';
+            }
+        };
+
+        const hideStatus = () => {
+            els.statusContainer.classList.remove('active');
+        };
+
+        // ========================================
+        // Llamar a Cobalt via TU proxy PHP
+        // ========================================
+        const convertWithCobalt = async (videoUrl, format) => {
+            // Llamamos a TU propio archivo PHP en el servidor
+            // Mismo dominio = sin problemas de CORS
+            console.log('Connecting to backend proxy...');
+            
+            const response = await fetch(CONFIG.PROXY_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: videoUrl,
+                    downloadMode: format === 'mp3' ? 'audio' : 'auto'
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server error:', errorText);
+                throw new Error(`Server Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Cobalt response:', data);
+            
+            // Validar respuesta
+            if (data.status === 'error') {
+                throw new Error(data.text || 'API Error');
+            }
+            
+            // Extraer URL de descarga
+            if (data.url) return data.url;
+            if (data.picker && data.picker[0]) return data.picker[0].url;
+            
+            throw new Error('No download URL found');
+        };
+
+        // ========================================
+        // Main Convert Function
+        // ========================================
+        const convert = async () => {
+            const url = els.urlInput.value.trim();
+            
+            if (!url) {
+                setInputState('error', 'Please enter a YouTube URL');
+                return;
+            }
+
+            if (!isValidUrl(url)) {
+                setInputState('error', 'Invalid YouTube URL format');
+                return;
+            }
+
+            setInputState('success', 'Valid URL');
+            hideStatus();
+            setLoading(true);
+            showStatus('loading', 'Processing...', 'Connecting to server...');
+
+            try {
+                const format = getFormat();
+                showStatus('loading', 'Converting...', `Generating ${format.toUpperCase()} file...`);
+                
+                const downloadUrl = await convertWithCobalt(url, format);
+                
+                setLoading(false);
+                showStatus(
+                    'success',
+                    'Ready to Download!',
+                    `Your ${format.toUpperCase()} file is ready. Click download.`,
+                    true,
+                    downloadUrl
+                );
+
+            } catch (error) {
+                // Solo mostrar error, NUNCA redirigir a otro sitio
+                console.error('Conversion error:', error);
+                setLoading(false);
+                
+                let errorMsg = error.message || 'Unknown error';
+                
+                // Detectar errores de CORS/red
+                if (error.message.includes('Failed to fetch') || 
+                    error.message.includes('NetworkError') || 
+                    error.message.includes('CORS') ||
+                    error.name === 'TypeError') {
+                    errorMsg = 'CORS/Network error. Try different API in config.';
+                    console.error('CORS ERROR - Cambia la URL en CONFIG.COBALT_API');
+                }
+                
+                showStatus('error', 'Conversion Failed', errorMsg);
+                // NO HAY FALLBACK - Solo muestra el error
+            }
+        };
+
+        // ========================================
+        // Event Listeners
+        // ========================================
+        const init = () => {
+            els.urlInput.addEventListener('input', () => {
+                const url = els.urlInput.value.trim();
+                if (!url) {
+                    setInputState('default', '');
+                } else if (isValidUrl(url)) {
+                    setInputState('success', 'Valid YouTube URL');
+                } else {
+                    setInputState('error', 'Enter a valid YouTube URL');
+                }
+            });
+
+            els.pasteBtn.addEventListener('click', async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    els.urlInput.value = text;
+                    els.urlInput.dispatchEvent(new Event('input'));
+                } catch (err) {
+                    console.warn('Clipboard access denied');
+                }
+            });
+
+            els.convertBtn.addEventListener('click', () => {
+                if (!isProcessing) convert();
+            });
+
+            els.urlInput.addEventListener('keypress', e => {
+                if (e.key === 'Enter' && !isProcessing) convert();
+            });
+
+            els.formatMp4.addEventListener('change', hideStatus);
+            els.formatMp3.addEventListener('change', hideStatus);
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
+</body>
+</html>
