@@ -54,7 +54,8 @@ export default async function handler(req, res) {
 
 // MP4 con youtube-mp41 API
 async function downloadMP4(videoId, res) {
-    const downloadUrl = `https://${MP4_API_HOST}/api/v1/download?id=${videoId}&format=720`;
+    // Parametros segun documentacion: id, format (calidad video), audioQuality, addInfo
+    const downloadUrl = `https://${MP4_API_HOST}/api/v1/download?id=${videoId}&format=720&audioQuality=128&addInfo=false`;
     console.log('MP4 Download URL:', downloadUrl);
     
     const downloadRes = await fetch(downloadUrl, {
